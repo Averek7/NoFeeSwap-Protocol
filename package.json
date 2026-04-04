@@ -1,0 +1,17 @@
+{
+  "name": "nofeeswap-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local NoFeeSwap development environment",
+  "scripts": {
+    "node": "hardhat node",
+    "deploy": "node scripts/deploy.js",
+    "start": "node scripts/start-node.js",
+    "stop": "node scripts/stop-node.js"
+  },
+  "dependencies": {
+    "ethers": "^6.15.0",
+    "hardhat": "2.24.0",
+    "solc": "0.8.28"
+  }
+}

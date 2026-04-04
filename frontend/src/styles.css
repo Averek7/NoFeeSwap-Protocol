@@ -1,0 +1,87 @@
+:root {
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at top left, rgba(14, 116, 144, 0.28), transparent 36%),
+    radial-gradient(circle at top right, rgba(234, 88, 12, 0.24), transparent 32%),
+    linear-gradient(180deg, #09111b 0%, #0f172a 58%, #172033 100%);
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input, select { font: inherit; }
+
+.shell { max-width: 1240px; margin: 0 auto; padding: 32px 20px 72px; }
+.hero { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; align-items: start; margin-bottom: 24px; }
+.eyebrow { margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.72rem; color: #67e8f9; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { font-size: clamp(2.4rem, 6vw, 4.8rem); line-height: 0.95; margin-bottom: 14px; }
+h2 { font-size: 1.4rem; margin-bottom: 16px; }
+.lede { max-width: 62ch; color: #cbd5e1; }
+
+.walletCard, .panel, .txBanner {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 24px 80px rgba(2, 6, 23, 0.35);
+}
+
+.walletCard, .panel { border-radius: 24px; padding: 22px; }
+.txBanner { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; border-radius: 18px; padding: 16px 18px; margin-bottom: 24px; }
+.txBanner.pending { border-color: rgba(250, 204, 21, 0.5); }
+.txBanner.confirmed { border-color: rgba(34, 197, 94, 0.45); }
+.txBanner.error { border-color: rgba(248, 113, 113, 0.5); }
+
+.gridTwo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 24px; }
+.gridForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.gridForm label, .stack label { display: grid; gap: 8px; color: #e2e8f0; }
+
+.input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+  padding: 12px 14px;
+}
+
+.primaryButton, .secondaryButton, .segment {
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease, background 150ms ease;
+}
+
+.primaryButton:hover, .secondaryButton:hover, .segment:hover { transform: translateY(-1px); }
+.primaryButton { padding: 12px 18px; background: linear-gradient(135deg, #f97316, #ea580c); color: white; font-weight: 700; }
+.secondaryButton { padding: 12px 18px; background: rgba(15, 118, 110, 0.18); color: #99f6e4; }
+.wide { grid-column: 1 / -1; }
+
+.stack { display: grid; gap: 14px; }
+.row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.caption { color: #94a3b8; font-size: 0.92rem; }
+.metricCard { border-radius: 18px; padding: 16px; background: rgba(14, 116, 144, 0.12); }
+.metricGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.curvePreview { border-radius: 18px; padding: 12px; background: rgba(30, 41, 59, 0.72); }
+
+.kernelCard { grid-column: 1 / -1; border-radius: 22px; padding: 18px; background: rgba(30, 41, 59, 0.78); display: grid; gap: 18px; }
+.kernelEditor { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: center; }
+.kernelBackdrop { fill: rgba(15, 23, 42, 0.92); stroke: rgba(148, 163, 184, 0.24); }
+.kernelLine { fill: none; stroke: #2dd4bf; stroke-width: 4; stroke-linecap: round; }
+.kernelNode { fill: #f97316; stroke: white; stroke-width: 3; }
+.sliderGroup { display: grid; gap: 14px; }
+.sliderGroup input[type="range"] { width: 100%; }
+
+.segmented { display: inline-flex; gap: 8px; padding: 6px; border-radius: 999px; background: rgba(30, 41, 59, 0.9); }
+.segment { padding: 10px 14px; background: transparent; color: #cbd5e1; }
+.segment.active { background: rgba(15, 118, 110, 0.24); color: #ccfbf1; }
+
+.buttonRow { display: flex; gap: 12px; flex-wrap: wrap; }
+.positionCard, .previewCard { border-radius: 18px; padding: 16px; background: rgba(30, 41, 59, 0.78); margin-top: 16px; }
+.ok { color: #4ade80; }
+.warn { color: #fbbf24; }
+code { font-family: "Cascadia Code", "Consolas", monospace; font-size: 0.9rem; }
+
+@media (max-width: 920px) {
+  .hero, .gridTwo, .gridForm, .kernelEditor, .metricGrid { grid-template-columns: 1fr; }
+}

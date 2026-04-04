@@ -1,0 +1,9 @@
+/package-lock.json
+/frontend/dist
+/node_modules/
+/.local/
+/artifacts/
+/deployments/
+/frontend/package-lock.json
+/frontend/node_modules
+/owner-account-metamask.json
