@@ -1,12 +1,11 @@
 import deployment from "../../../deployments/local.json";
 
-export const PREFERRED_LOCAL_CHAIN_ID = "0x7a69";
-export const FALLBACK_LOCAL_CHAIN_ID = "0x539";
+export const PREFERRED_LOCAL_CHAIN_ID = "0x539";
 export const SUPPORTED_LOCAL_CHAIN_IDS = [PREFERRED_LOCAL_CHAIN_ID];
 
 export const LOCAL_CHAIN = {
   chainId: PREFERRED_LOCAL_CHAIN_ID,
-  chainName: "Hardhat Local 31337",
+  chainName: "Hardhat Local 1337",
   rpcUrls: ["http://127.0.0.1:8545"],
   nativeCurrency: {
     name: "Ether",
@@ -14,6 +13,11 @@ export const LOCAL_CHAIN = {
     decimals: 18
   }
 };
+
+const [samplePoolToken0, samplePoolToken1] =
+  BigInt(deployment.mockTokens.token0) < BigInt(deployment.mockTokens.token1)
+    ? [deployment.mockTokens.token0, deployment.mockTokens.token1]
+    : [deployment.mockTokens.token1, deployment.mockTokens.token0];
 
 export const DEPLOYMENT = {
   ...deployment,
@@ -38,8 +42,8 @@ export const DEPLOYMENT = {
   samplePool: {
     name: "Sample Pool",
     ...deployment.samplePool,
-    token0: deployment.mockTokens.token0,
-    token1: deployment.mockTokens.token1
+    token0: samplePoolToken0,
+    token1: samplePoolToken1
   }
 };
 

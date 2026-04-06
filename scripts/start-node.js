@@ -9,7 +9,9 @@ const STATE_DIR = path.join(ROOT, ".local");
 const PID_FILE = path.join(STATE_DIR, "hardhat-node.pid");
 const LOG_FILE = path.join(STATE_DIR, "hardhat-node.log");
 const ERR_FILE = path.join(STATE_DIR, "hardhat-node.err.log");
-const HARDHAT_CMD = path.join(ROOT, "node_modules", ".bin", "hardhat.cmd");
+const HARDHAT_CMD = process.platform === "win32"
+  ? path.join(ROOT, "node_modules", ".bin", "hardhat.cmd")
+  : path.join(ROOT, "node_modules", ".bin", "hardhat");
 
 fs.mkdirSync(STATE_DIR, { recursive: true });
 
@@ -28,7 +30,10 @@ if (fs.existsSync(PID_FILE)) {
 
 const outFd = fs.openSync(LOG_FILE, "a");
 const errFd = fs.openSync(ERR_FILE, "a");
-const child = spawn("cmd.exe", ["/c", HARDHAT_CMD, "node"], {
+const command = process.platform === "win32" ? "cmd.exe" : HARDHAT_CMD;
+const args = process.platform === "win32" ? ["/c", HARDHAT_CMD, "node"] : ["node"];
+
+const child = spawn(command, args, {
   cwd: ROOT,
   detached: true,
   stdio: ["ignore", outFd, errFd]

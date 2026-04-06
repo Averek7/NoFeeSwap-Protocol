@@ -7,3 +7,5 @@
 /frontend/package-lock.json
 /frontend/node_modules
 /owner-account-metamask.json
+/core
+/operator

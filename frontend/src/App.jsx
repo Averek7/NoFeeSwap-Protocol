@@ -3,7 +3,6 @@ import { ethers } from "ethers";
 import { ACCESS_ABI, DELEGATEE_ABI, ERC20_ABI, NOFEESWAP_ABI } from "./lib/abi";
 import {
   DEPLOYMENT,
-  FALLBACK_LOCAL_CHAIN_ID,
   LOCAL_CHAIN,
   POOL_PRESETS,
   PREFERRED_LOCAL_CHAIN_ID,
@@ -43,6 +42,26 @@ function formatUnits(value, decimals) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 6,
   });
+}
+
+function floorDiv(a, b) {
+  let q = a / b;
+  if ((a < 0n) !== (b < 0n) && a % b !== 0n) q -= 1n;
+  return q;
+}
+
+function ceilDiv(a, b) {
+  let q = a / b;
+  if ((a < 0n) === (b < 0n) && a % b !== 0n) q += 1n;
+  return q;
+}
+
+function snapRangeToSpacing(qMin, qMax, spacing) {
+  if (!spacing || spacing <= 0n) return { qMin, qMax };
+  const snappedMin = floorDiv(BigInt(qMin), spacing) * spacing;
+  let snappedMax = ceilDiv(BigInt(qMax), spacing) * spacing;
+  if (snappedMax <= snappedMin) snappedMax = snappedMin + spacing;
+  return { qMin: snappedMin, qMax: snappedMax };
 }
 
 /* ════════════════════════════════════════════════════════════ */
@@ -111,18 +130,9 @@ export default function App() {
 
     if (SUPPORTED_LOCAL_CHAIN_IDS.includes(chainId)) {
       setNetworkReady(true);
-      setNetworkLabel("Hardhat 31337");
-      setNetworkMessage("Connected to the preferred local Hardhat chain.");
+      setNetworkLabel("Hardhat 1337");
+      setNetworkMessage("Connected to local Hardhat chain.");
       return true;
-    }
-
-    if (chainId === FALLBACK_LOCAL_CHAIN_ID) {
-      setNetworkReady(false);
-      setNetworkLabel("Localhost 1337");
-      setNetworkMessage(
-        "MetaMask is on Localhost 1337, but this node expects 31337. Edit or recreate the Localhost network in MetaMask with chain ID 31337."
-      );
-      return false;
     }
 
     setNetworkReady(false);
@@ -164,16 +174,17 @@ export default function App() {
     [pools, selectedPoolId]
   );
   const currentPrice = poolState?.currentPrice ?? selectedPool?.currentPrice;
+  const hasPoolLiquidity = (poolState?.sharesTotal ?? 0n) > 0n;
 
   const swapPreview = useMemo(() => {
     if (!selectedPool) return null;
     const amount = Number(swapForm.amountIn || 0);
     if (!amount) return null;
-    const zeroForOne = swapForm.tokenIn.toLowerCase() === selectedPool.token0.toLowerCase();
+    const token0In = swapForm.tokenIn.toLowerCase() === selectedPool.token0.toLowerCase();
     return estimateSwapFromSpot({
       currentPrice: poolState?.currentPrice ?? selectedPool.currentPrice,
       amount,
-      zeroForOne,
+      token0In,
       slippage: Number(swapForm.slippage || 0),
     });
   }, [poolState, selectedPool, swapForm]);
@@ -274,35 +285,16 @@ export default function App() {
         params: [{ chainId: PREFERRED_LOCAL_CHAIN_ID }],
       });
     } catch (err) {
-      const message = err?.message ?? "";
       if (err.code === 4902) {
-        try {
-          await window.ethereum.request({ method: "wallet_addEthereumChain", params: [LOCAL_CHAIN] });
-        } catch (addErr) {
-          const addMessage = addErr?.message ?? "";
-          if (
-            addMessage.includes("same RPC endpoint as existing network") ||
-            addMessage.includes("same rpc endpoint")
-          ) {
-            await window.ethereum.request({
-              method: "wallet_switchEthereumChain",
-              params: [{ chainId: FALLBACK_LOCAL_CHAIN_ID }],
-            });
-          } else {
-            throw addErr;
-          }
-        }
-      } else if (message.includes("same RPC endpoint as existing network")) {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: FALLBACK_LOCAL_CHAIN_ID }],
-        });
-      } else throw err;
+        await window.ethereum.request({ method: "wallet_addEthereumChain", params: [LOCAL_CHAIN] });
+      } else {
+        throw err;
+      }
     }
 
     const nextChainId = await window.ethereum.request({ method: "eth_chainId" });
     if (!syncNetworkState(nextChainId)) {
-      throw new Error("MetaMask is still not on Hardhat 31337. Update the Localhost network in MetaMask to chain ID 31337, then retry.");
+      throw new Error("MetaMask is still not on Hardhat 1337. Update the Localhost network in MetaMask to chain ID 1337, then retry.");
     }
   }
 
@@ -322,15 +314,31 @@ export default function App() {
   }
 
   async function loadPoolState() {
-    const access = new ethers.Contract(DEPLOYMENT.contracts.access, ACCESS_ABI, provider);
-    const dynamic = await access._readDynamicParams(DEPLOYMENT.contracts.nofeeswap, selectedPool.poolId);
-    const curve = await access._readCurve(DEPLOYMENT.contracts.nofeeswap, selectedPool.poolId, dynamic.logPriceCurrent);
-    setPoolState({
-      logPriceCurrent: dynamic.logPriceCurrent,
-      sharesTotal: dynamic.sharesTotal,
-      currentPrice: offsettedToPrice(dynamic.logPriceCurrent),
-      curve,
-    });
+    try {
+      const access = new ethers.Contract(DEPLOYMENT.contracts.access, ACCESS_ABI, provider);
+      const dynamic = await access._readDynamicParams(DEPLOYMENT.contracts.nofeeswap, selectedPool.poolId);
+
+      let curve = [];
+      try {
+        curve = await access._readCurve(
+          DEPLOYMENT.contracts.nofeeswap,
+          selectedPool.poolId,
+          dynamic.logPriceCurrent
+        );
+      } catch {
+        // Some pools can expose dynamic params while curve reads are unavailable.
+        curve = [];
+      }
+
+      setPoolState({
+        logPriceCurrent: dynamic.logPriceCurrent,
+        sharesTotal: dynamic.sharesTotal,
+        currentPrice: offsettedToPrice(dynamic.logPriceCurrent),
+        curve,
+      });
+    } catch (error) {
+      console.error("loadPoolState failed:", error);
+    }
   }
 
   /* ════════════ tx wrapper ════════════ */
@@ -341,8 +349,12 @@ export default function App() {
       setTxState({ type: "pending", label, message: "Broadcasting…", hash: tx.hash });
       const receipt = await tx.wait();
       setTxState({ type: "confirmed", label, message: `Confirmed in block ${receipt.blockNumber}.`, hash: tx.hash });
-      await refreshWalletState();
-      await loadPoolState();
+      try {
+        await refreshWalletState();
+        await loadPoolState();
+      } catch (refreshError) {
+        console.error("Post-transaction refresh failed:", refreshError);
+      }
       return receipt;
     } catch (err) {
       const msg = err?.shortMessage || err?.reason || err?.message || "Transaction reverted.";
@@ -357,7 +369,7 @@ export default function App() {
       setTxState({
         type: "error",
         label: "Wrong network",
-        message: "Switch MetaMask to Hardhat 31337 before enabling the operator.",
+        message: "Switch MetaMask to Hardhat 1337 before enabling the operator.",
       });
       return;
     }
@@ -381,7 +393,7 @@ export default function App() {
       setTxState({
         type: "error",
         label: "Wrong network",
-        message: "Switch MetaMask to Hardhat 31337 before initializing a pool.",
+        message: "Switch MetaMask to Hardhat 1337 before initializing a pool.",
       });
       return;
     }
@@ -427,12 +439,16 @@ export default function App() {
       setTxState({
         type: "error",
         label: "Wrong network",
-        message: "Switch MetaMask to Hardhat 31337 before loading a position.",
+        message: "Switch MetaMask to Hardhat 1337 before loading a position.",
       });
       return;
     }
     const nofeeswap = new ethers.Contract(DEPLOYMENT.contracts.nofeeswap, NOFEESWAP_ABI, provider);
-    const { qMin, qMax } = rangePricesToQ(Number(liquidityForm.lowerPrice), Number(liquidityForm.upperPrice));
+    const raw = rangePricesToQ(Number(liquidityForm.lowerPrice), Number(liquidityForm.upperPrice));
+    const spacing = selectedPool?.curve?.length >= 2
+      ? BigInt(selectedPool.curve[1]) - BigInt(selectedPool.curve[0])
+      : null;
+    const { qMin, qMax } = snapRangeToSpacing(raw.qMin, raw.qMax, spacing);
     const tagShares = ethers.solidityPackedKeccak256(
       ["uint256", "int256", "int256"],
       [selectedPool.poolId, qMin, qMax]
@@ -447,12 +463,16 @@ export default function App() {
       setTxState({
         type: "error",
         label: "Wrong network",
-        message: "Switch MetaMask to Hardhat 31337 before changing liquidity.",
+        message: "Switch MetaMask to Hardhat 1337 before changing liquidity.",
       });
       return;
     }
     const nofeeswap = new ethers.Contract(DEPLOYMENT.contracts.nofeeswap, NOFEESWAP_ABI, signer);
-    const { qMin, qMax } = rangePricesToQ(Number(liquidityForm.lowerPrice), Number(liquidityForm.upperPrice));
+    const raw = rangePricesToQ(Number(liquidityForm.lowerPrice), Number(liquidityForm.upperPrice));
+    const spacing = selectedPool?.curve?.length >= 2
+      ? BigInt(selectedPool.curve[1]) - BigInt(selectedPool.curve[0])
+      : null;
+    const { qMin, qMax } = snapRangeToSpacing(raw.qMin, raw.qMax, spacing);
     const amount = ethers.getBigInt(liquidityForm.shares);
     if (liquidityForm.mode === "mint") {
       for (const token of DEPLOYMENT.tokens) await ensureTokenApproval(token.address, ethers.MaxUint256);
@@ -479,7 +499,15 @@ export default function App() {
       setTxState({
         type: "error",
         label: "Wrong network",
-        message: "Switch MetaMask to Hardhat 31337 before swapping.",
+        message: "Switch MetaMask to Hardhat 1337 before swapping.",
+      });
+      return;
+    }
+    if (!hasPoolLiquidity) {
+      setTxState({
+        type: "error",
+        label: "No pool liquidity",
+        message: "Mint liquidity into the selected pool before swapping.",
       });
       return;
     }
@@ -488,10 +516,14 @@ export default function App() {
     const decimals = tokenMeta[tokenIn]?.decimals ?? 18;
     const amount = ethers.parseUnits(swapForm.amountIn || "0", decimals);
     await ensureTokenApproval(tokenIn, amount);
-    const zeroForOne = tokenIn.toLowerCase() === selectedPool.token0.toLowerCase() ? 0 : 1;
+    const token0In = tokenIn.toLowerCase() === selectedPool.token0.toLowerCase();
+    const zeroForOne = token0In ? 0 : 1;
     const cp = poolState?.currentPrice ?? selectedPool.currentPrice;
     const slippage = Number(swapForm.slippage || 0);
-    const limitPrice = zeroForOne === 0 ? cp * (1 - slippage / 100) : cp * (1 + slippage / 100);
+    const limitPriceRaw = zeroForOne === 0
+      ? cp * (1 + slippage / 100)
+      : cp * (1 - slippage / 100);
+    const limitPrice = Math.max(limitPriceRaw, 1e-12);
     const sequence = buildSwapSequence({
       nofeeswap: DEPLOYMENT.contracts.nofeeswap,
       token0: selectedPool.token0, token1: selectedPool.token1,
@@ -844,12 +876,16 @@ export default function App() {
                       onChange={(v) => setSwapForm((f) => ({ ...f, amountIn: v }))}
                       type="number"
                       min="0"
+                      step="any"
                     />
                     <FieldInput
                       label="Slippage Tolerance"
                       hint="Percentage (e.g. 1 = 1%)"
                       value={swapForm.slippage}
                       onChange={(v) => setSwapForm((f) => ({ ...f, slippage: v }))}
+                      type="number"
+                      min="0"
+                      step="any"
                       suffix="%"
                     />
 
@@ -873,9 +909,15 @@ export default function App() {
                     <button
                       type="submit"
                       className="btn btn-primary btn-full"
-                      disabled={!signer || !operatorEnabled}
+                      disabled={!signer || !operatorEnabled || !hasPoolLiquidity}
                     >
-                      {!signer ? "Connect Wallet" : !operatorEnabled ? "Enable Operator First" : "Execute Swap"}
+                      {!signer
+                        ? "Connect Wallet"
+                        : !operatorEnabled
+                          ? "Enable Operator First"
+                          : !hasPoolLiquidity
+                            ? "Mint Liquidity First"
+                            : "Execute Swap"}
                     </button>
                   </form>
                 </div>
@@ -1037,7 +1079,7 @@ function StatCard({ label, value, sub, accent }) {
   );
 }
 
-function FieldInput({ label, hint, value, onChange, type = "text", min, suffix }) {
+function FieldInput({ label, hint, value, onChange, type = "text", min, step, suffix }) {
   return (
     <div className="field-group">
       <label className="field-label">{label}</label>
@@ -1046,6 +1088,7 @@ function FieldInput({ label, hint, value, onChange, type = "text", min, suffix }
           className="input"
           type={type}
           min={min}
+          step={step}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />

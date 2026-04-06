@@ -253,9 +253,9 @@ export function buildSwapSequence({ nofeeswap, token0, token1, recipient, poolId
   return pack(["uint32", ...new Array(sequence.length).fill("bytes")], [deadline, ...sequence]);
 }
 
-export function estimateSwapFromSpot({ currentPrice, amount, zeroForOne, slippage }) {
+export function estimateSwapFromSpot({ currentPrice, amount, token0In, slippage }) {
   const amountNumber = Number(amount);
-  const spotOut = zeroForOne ? amountNumber / currentPrice : amountNumber * currentPrice;
+  const spotOut = token0In ? amountNumber * currentPrice : amountNumber / currentPrice;
   const impact = Math.min(Math.max(slippage * 0.4, 0.05), Number(slippage));
   return {
     estimatedOutput: spotOut * (1 - impact / 100),

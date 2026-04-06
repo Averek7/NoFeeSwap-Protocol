@@ -13,7 +13,7 @@ module.exports = {
   networks: {
     hardhat: {
       hardfork: "cancun",
-      chainId: 31337,
+      chainId: 1337,
       initialBaseFeePerGas: 0,
       allowUnlimitedContractSize: true,
       accounts: {

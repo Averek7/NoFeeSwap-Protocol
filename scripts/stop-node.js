@@ -14,10 +14,19 @@ if (!fs.existsSync(PID_FILE)) {
 const pid = Number(fs.readFileSync(PID_FILE, "utf8").trim());
 if (pid) {
   try {
-    process.kill(pid);
+    if (process.platform !== "win32") {
+      process.kill(-pid);
+    } else {
+      process.kill(pid);
+    }
     console.log(`Stopped Hardhat node with PID ${pid}`);
   } catch (error) {
-    console.log("PID file existed, but the process was not running.");
+    try {
+      process.kill(pid);
+      console.log(`Stopped Hardhat node with PID ${pid}`);
+    } catch {
+      console.log("PID file existed, but the process was not running.");
+    }
   }
 }
 
