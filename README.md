@@ -31,6 +31,21 @@ npm run dev
 
 The React app expects the local Hardhat node at `http://127.0.0.1:8545` and uses the addresses from `deployments/local.json`.
 
+## Safe Mempool Monitor
+
+This backend watches pending swap transactions from the frontend, decodes the NoFeeSwap operator payload, and prints a sandwich-risk simulation without submitting any on-chain transactions.
+
+```powershell
+npm run automine:off
+npm run bot
+```
+
+Submit a swap from the frontend while automine is off so the transaction remains visible in the pending pool. Re-enable instant mining afterward:
+
+```powershell
+npm run automine:on
+```
+
 ## Local Accounts
 
 The Hardhat node uses the standard test mnemonic:

@@ -7,11 +7,19 @@
     "node": "hardhat node",
     "deploy": "node scripts/deploy.js",
     "start": "node scripts/start-node.js",
-    "stop": "node scripts/stop-node.js"
+    "stop": "node scripts/stop-node.js",
+    "bot": "tsx backend/src/index.ts",
+    "automine:off": "tsx backend/src/setAutomine.ts off",
+    "automine:on": "tsx backend/src/setAutomine.ts on"
   },
   "dependencies": {
     "ethers": "^6.15.0",
     "hardhat": "2.24.0",
     "solc": "0.8.28"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

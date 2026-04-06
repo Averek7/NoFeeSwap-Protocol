@@ -1,7 +1,11 @@
 import deployment from "../../../deployments/local.json";
 
+export const PREFERRED_LOCAL_CHAIN_ID = "0x7a69";
+export const FALLBACK_LOCAL_CHAIN_ID = "0x539";
+export const SUPPORTED_LOCAL_CHAIN_IDS = [PREFERRED_LOCAL_CHAIN_ID];
+
 export const LOCAL_CHAIN = {
-  chainId: "0x7a69",
+  chainId: PREFERRED_LOCAL_CHAIN_ID,
   chainName: "Hardhat Local 31337",
   rpcUrls: ["http://127.0.0.1:8545"],
   nativeCurrency: {
