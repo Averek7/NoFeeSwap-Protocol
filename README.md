@@ -112,6 +112,13 @@ Execution mode (`EXECUTE_LOCAL_ATTACK=true`) is intentionally guarded:
 - sample pool-only handling in current implementation
 - profitability threshold gating before submitting txs
 - separate attacker signer index (`ATTACKER_INDEX`, default `2`)
+- optional local mining after submit (`MINE_AFTER_ATTACK`, default `true`)
+
+When enabled, the bot attempts:
+- frontrun tx submission
+- backrun tx submission in opposite swap direction
+- mined-order verification (`front < victim < back`) when present in the same block
+- attacker balance delta reporting (`Δtoken0`, `Δtoken1`)
 
 This mode is for controlled local demos and ordering experiments only.
 
@@ -141,6 +148,17 @@ Optional local execution mode (localhost-restricted):
 
 ```bash
 EXECUTE_LOCAL_ATTACK=true ATTACKER_INDEX=2 ATTACK_FRACTION_BPS=3000 npm run bot
+```
+
+Optional execution tuning:
+
+```bash
+EXECUTE_LOCAL_ATTACK=true \
+ATTACKER_INDEX=2 \
+ATTACK_FRACTION_BPS=3000 \
+MIN_NET_PNL_TOKENOUT=0 \
+MINE_AFTER_ATTACK=true \
+npm run bot
 ```
 
 Notes:
@@ -185,7 +203,9 @@ The following high-impact edits were introduced recently to stabilize local exec
   - added no-liquidity swap guard (`Mint Liquidity First`)
 - Backend:
   - expanded mempool output to structured simulation metrics
-  - added optional local attack execution module (`backend/src/executor.ts`)
+  - completed local guarded attack execution module (`backend/src/executor.ts`)
+  - added opposite-direction backrun construction
+  - added block-order verification and attacker balance delta reporting
   - added websocket transport error handlers and execution mode status logging
   - added stronger typings for analysis output
 - Scripts:
@@ -203,7 +223,7 @@ The following high-impact edits were introduced recently to stabilize local exec
 - Task 1 (local deploy environment): `COMPLETE`
 - Task 2 (frontend flows): `COMPLETE`
 - Task 3a/3b (mempool watch + decode): `COMPLETE`
-- Task 3c (sandwich): `PARTIAL`
+- Task 3c (sandwich): `COMPLETE` for local guarded mode
   - off-chain simulation: `COMPLETE`
-  - local guarded execution mode: `PARTIAL`
+  - local guarded execution mode: `COMPLETE`
   - public/mainnet execution support: `OMITTED` (out of scope by design)
