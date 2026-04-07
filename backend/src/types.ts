@@ -43,3 +43,21 @@ export type DecodedSwap = {
   nonce: number;
   gasPriceGwei?: string;
 };
+
+export type SwapAnalysis = {
+  currentPrice: number;
+  limitPrice: number;
+  tradeSize: number;
+  slippageBps: number;
+  estimatedImpactBps: number;
+  vulnerable: boolean;
+  riskRatio: number;
+  direction: string;
+  sharesTotal: bigint;
+  frontrunSize: number;
+  backrunSize: number;
+  estimatedGrossPnlTokenOut: number;
+  estimatedNetPnlTokenOut: number;
+  profitable: boolean;
+  recommendation: string;
+};

@@ -8,7 +8,16 @@ function compact(value) {
 function Spinner() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" className="spinner">
-      <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="22" strokeDashoffset="8" />
+      <circle
+        cx="7"
+        cy="7"
+        r="5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeDasharray="22"
+        strokeDashoffset="8"
+      />
     </svg>
   );
 }
@@ -26,6 +35,24 @@ export default function ConnectionPanel({
 }) {
   const [open, setOpen] = useState(false);
 
+  const handleDisconnect = async () => {
+    try {
+      if (window.ethereum?.request) {
+        // This removes the site from MetaMask's "connected sites" list
+        await window.ethereum.request({
+          method: "wallet_revokePermissions",
+          params: [{ eth_accounts: {} }],
+        });
+      }
+    } catch (err) {
+      // wallet_revokePermissions may throw on some older MetaMask versions —
+      // still proceed with local state cleanup
+      console.warn("Failed to revoke permissions:", err);
+    }
+    setOpen(false);
+    onDisconnect(); // clear parent state (address, etc.)
+  };
+
   if (!address) {
     return (
       <button
@@ -33,7 +60,13 @@ export default function ConnectionPanel({
         onClick={onConnect}
         disabled={!hasMetaMask || walletStatus === "connecting"}
       >
-        {walletStatus === "connecting" ? <><Spinner /> Connecting...</> : "Connect Wallet"}
+        {walletStatus === "connecting" ? (
+          <>
+            <Spinner /> Connecting...
+          </>
+        ) : (
+          "Connect Wallet"
+        )}
       </button>
     );
   }
@@ -45,7 +78,12 @@ export default function ConnectionPanel({
           <span className={`dot ${networkReady ? "dot-green" : "dot-amber"}`} />
           <span className="mono">{compact(address)}</span>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d={open ? "M2 8l4-4 4 4" : "M2 4l4 4 4-4"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path
+              d={open ? "M2 8l4-4 4 4" : "M2 4l4 4 4-4"}
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
         {open && (
@@ -55,22 +93,28 @@ export default function ConnectionPanel({
               <code className="mono">{address}</code>
             </div>
             <div className="wallet-dropdown-info">
-              <span className={networkReady ? "badge badge-green" : "badge badge-amber"}>
+              <span
+                className={
+                  networkReady ? "badge badge-green" : "badge badge-amber"
+                }
+              >
                 {networkLabel}
               </span>
             </div>
-            {networkMessage && <p className="wallet-dropdown-message">{networkMessage}</p>}
+            {networkMessage && (
+              <p className="wallet-dropdown-message">{networkMessage}</p>
+            )}
             {!networkReady && (
-              <button className="btn btn-secondary btn-sm btn-full" onClick={onSwitchNetwork}>
+              <button
+                className="btn btn-secondary btn-sm btn-full"
+                onClick={onSwitchNetwork}
+              >
                 Switch to Hardhat 31337
               </button>
             )}
             <button
               className="btn btn-danger btn-sm btn-full"
-              onClick={() => {
-                onDisconnect();
-                setOpen(false);
-              }}
+              onClick={handleDisconnect}
             >
               Disconnect
             </button>
