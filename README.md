@@ -18,6 +18,28 @@ Local workspace for running NoFeeSwap end-to-end on Hardhat:
 
 Deployment output is written to `deployments/local.json`.
 
+## Prerequisites
+
+Required software:
+
+- Node.js `>= 20` (recommended `22+`)
+- npm `>= 10`
+- Git `>= 2.40`
+- MetaMask (or compatible injected wallet)
+
+Verified local chain target:
+
+- Hardhat local RPC: `http://127.0.0.1:8545`
+- Chain ID: `1337`
+
+Optional environment variables (bot execution mode):
+
+- `EXECUTE_LOCAL_ATTACK` (`true|false`, default `false`)
+- `ATTACKER_INDEX` (default `2`)
+- `ATTACK_FRACTION_BPS` (default `3000`)
+- `MIN_NET_PNL_TOKENOUT` (default `0`)
+- `MINE_AFTER_ATTACK` (`true|false`, default `true`)
+
 ## Quick Start
 
 ```bash
@@ -46,6 +68,69 @@ After capturing pending tx analysis:
 
 ```bash
 npm run automine:on
+```
+
+## Step-by-Step Setup (From Scratch)
+
+### 1) Install dependencies
+
+```bash
+npm install
+cd frontend && npm install && cd ..
+```
+
+### 2) Start local node and deploy contracts
+
+```bash
+npm run start
+npm run deploy
+```
+
+### 3) Start frontend
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 4) Connect wallet
+
+- Add/switch MetaMask network:
+  - RPC: `http://127.0.0.1:8545`
+  - Chain ID: `1337`
+  - Symbol: `ETH`
+- Use owner account:
+  - `0x70997970C51812dc3A010C7d01b50e0d17dc79C8`
+
+### 5) Start backend bot
+
+Simulation mode:
+
+```bash
+npm run automine:off
+npm run bot
+```
+
+After collecting pending tx logs:
+
+```bash
+npm run automine:on
+```
+
+Execution mode (local guarded):
+
+```bash
+npm run automine:off
+EXECUTE_LOCAL_ATTACK=true ATTACKER_INDEX=2 ATTACK_FRACTION_BPS=3000 MIN_NET_PNL_TOKENOUT=0 MINE_AFTER_ATTACK=true npm run bot
+```
+
+### 6) Fresh reset between test iterations
+
+```bash
+npm run automine:on
+npm run stop
+npm run start
+npm run deploy
 ```
 
 ## Technical Architecture
@@ -190,6 +275,14 @@ npx tsc --noEmit
 - backend `ECONNREFUSED`: start node first (`npm run start`).
 - swap estimate reverts with custom errors: verify token ordering and slippage direction assumptions for selected pool.
 - pending tx not seen by bot: confirm `automine:off`, then submit a new swap tx after bot starts.
+
+## Known Limitations
+
+- Profitability model is heuristic and simplified; it is not a production searcher strategy.
+- Execution mode is intentionally localhost-guarded and scoped for demo/testing.
+- Current execution path is tuned for the sample pool flow and local assumptions.
+- No public/mainnet execution support.
+- No Solidity attack helper contract (EOA sequencing only).
 
 ## Recent Edits (Transparency)
 
