@@ -77,7 +77,14 @@ async function main() {
       if (exec.executed) {
         console.log("--- Execution (Local EOA) ---");
         console.log(`front-run hash:  ${exec.frontrunHash}`);
+        console.log(`victim hash:     ${exec.victimHash}`);
         console.log(`back-run hash:   ${exec.backrunHash}`);
+        console.log(`front block:     ${exec.frontrunBlock ?? "n/a"}`);
+        console.log(`victim block:    ${exec.victimBlock ?? "n/a"}`);
+        console.log(`back block:      ${exec.backrunBlock ?? "n/a"}`);
+        console.log(`order verified:  ${exec.orderVerified ? "yes" : "no"}`);
+        console.log(`attacker Δtoken0:${exec.attackerDeltaToken0 ?? "n/a"}`);
+        console.log(`attacker Δtoken1:${exec.attackerDeltaToken1 ?? "n/a"}`);
       } else {
         console.log(`execution:       skipped (${exec.skippedReason})`);
       }

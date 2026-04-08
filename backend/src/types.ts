@@ -61,3 +61,17 @@ export type SwapAnalysis = {
   profitable: boolean;
   recommendation: string;
 };
+
+export type AttackExecutionResult = {
+  executed: boolean;
+  skippedReason?: string;
+  frontrunHash?: string;
+  backrunHash?: string;
+  victimHash?: string;
+  frontrunBlock?: number;
+  victimBlock?: number;
+  backrunBlock?: number;
+  orderVerified?: boolean;
+  attackerDeltaToken0?: string;
+  attackerDeltaToken1?: string;
+};

